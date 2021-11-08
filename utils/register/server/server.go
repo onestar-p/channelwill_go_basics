@@ -4,7 +4,7 @@
  * @Author: sueRimn
  * @Date: 2021-11-05 11:27:37
  * @LastEditors: sueRimn
- * @LastEditTime: 2021-11-08 10:03:28
+ * @LastEditTime: 2021-11-08 17:13:48
  */
 package service
 
@@ -61,17 +61,21 @@ func RunGRPCServer(c *GRPCConfig) error {
 		opts      []grpc.ServerOption // 初始化拦截器
 	)
 
+	// 注册拦截器
+	i := interceptor.NewInterceptor()
 	if c.AuthPublicKeyFile != "" {
-		// 实例一个自定义拦截器
-		in, err := interceptor.Auth(c.AuthPublicKeyFile)
-		if err != nil {
-			zap.S().Fatal("cannot create auth interceptor", err.Error())
-		}
-
-		// 实例一个grpc，并添加拦截器
-		opts = append(opts, grpc.UnaryInterceptor(in))
+		i.AddMiddleware(&interceptor.Auth{
+			PublicKeyFile: c.AuthPublicKeyFile,
+		})
 	}
 
+	// i.AddMiddleware(&interceptor.Mymidd{})
+
+	in, err := i.UnaryServerInterceptor()
+	if err != nil {
+		zap.S().Fatal("cannot create interceptor", err.Error())
+	}
+	opts = append(opts, grpc.UnaryInterceptor(in))
 	s := grpc.NewServer(opts...)
 
 	// 服务注册....
@@ -80,7 +84,7 @@ func RunGRPCServer(c *GRPCConfig) error {
 	// consul 注册服务
 	regsiterClient := consul.NewRegistryClient(appConfig.ConsulInfo.Ip, appConfig.ConsulInfo.Port)
 	serviceID := uuid.NewV4() // 随机生成注册服务ID
-	err := regsiterClient.Register(
+	err = regsiterClient.Register(
 		s,
 		appConfig.Ip,
 		appConfig.Port,

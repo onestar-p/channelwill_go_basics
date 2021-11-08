@@ -137,7 +137,7 @@ if err := service.RunGRPCServer(&service.GRPCConfig{
 
 ```
 
-## 相关说明
+### 四、其他说明
 
 1. 采用JWT授权登录，可参考```Auth:Login()```接口的生成token方法，前端获取到```token```后需要保存到```Header```中的```authorization```。
 2. 登录状态判断，可参考```Auth:GetUserToken()```方法。

@@ -1,3 +1,11 @@
+/*
+ * @Descripttion:
+ * @version:
+ * @Author: sueRimn
+ * @Date: 2021-11-05 09:49:24
+ * @LastEditors: sueRimn
+ * @LastEditTime: 2021-11-08 17:01:13
+ */
 package jwt
 
 import (

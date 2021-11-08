@@ -1,16 +1,14 @@
 package interceptor
 
 import (
+	"channelwill_go_basics/utils/jwt"
 	"context"
 	"fmt"
 	"strings"
 
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-
-	"channelwill_go_basics/utils/jwt"
 )
 
 const (
@@ -18,54 +16,42 @@ const (
 	bearerPrefix        = ""
 )
 
-func Auth(publicKeyFile string) (grpc.UnaryServerInterceptor, error) {
-	// 解析公钥
-	pubKey, err := jwt.NewJWTKey(publicKeyFile).GetPublicKey()
+type Auth struct {
+	PublicKeyFile string
+}
+
+func (a *Auth) Do(c context.Context) (context.Context, error) {
+	tkn, err := a.tokenFromContext(c)
 	if err != nil {
-		return nil, fmt.Errorf("cannot parse public key:%v", err)
-	}
-
-	i := &authInterceptor{
-		verifier: &jwt.JWTTokenVerifyer{
-			PublicKey: pubKey,
-		},
-	}
-	return i.HandleReq, nil
-}
-
-type tokenVerifier interface {
-	Verify(token string) (string, error)
-}
-
-type authInterceptor struct {
-	verifier tokenVerifier
-}
-
-func (i *authInterceptor) HandleReq(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-	tkn, err := tokenFromContext(ctx)
-	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "")
+		return c, fmt.Errorf("cannot parse public key:%v", err)
 	}
 
 	// 验证加密后的数据，并解密得到结果
 	if tkn != "" {
-		uid, err := i.verifier.Verify(tkn)
+		// 解析公钥
+		pubKey, err := jwt.NewJWTKey(a.PublicKeyFile).GetPublicKey()
 		if err != nil {
-			return nil, status.Errorf(codes.Unauthenticated, "token not valid:%v", err)
+			return c, fmt.Errorf("cannot parse public key:%v", err)
+		}
+		verifier := &jwt.JWTTokenVerifyer{
+			PublicKey: pubKey,
+		}
+		uid, err := verifier.Verify(tkn)
+		if err != nil {
+			return c, status.Errorf(codes.Unauthenticated, "token not valid:%v", err)
 		}
 		// 写入上下文
-		ctx = ContextWithUserId(ctx, uid)
+		c = ContextWithUserId(c, uid)
 	}
-
-	return handler(ctx, req)
+	return c, nil
 }
 
 /**
- * @name: 通过上下文获取token
+ * @name: 通过上下文获取token~
  * @param {context.Context} c
  * @return {*}
  */
-func tokenFromContext(c context.Context) (string, error) {
+func (a *Auth) tokenFromContext(c context.Context) (string, error) {
 	unauthenticated := status.Error(codes.Unauthenticated, "")
 
 	// 获取请求中的header数据
