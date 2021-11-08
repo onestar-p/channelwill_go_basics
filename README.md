@@ -1,9 +1,11 @@
 # golang基础框
 > grpc-gateway + gRPC
 
+#### 环境要求
 - golang版本：1.17
+- consul: V1.10.3
 
-## 使用扩展
+#### 使用扩展
 - go.uber.org/zap ：用于打印日志
 - entgo.io/ent ：ORM
 
@@ -12,7 +14,7 @@
 root
 ├── config // 配置文件目录
 │   └── cert // 私钥、公钥存放目录
-│       ├── private.key
+│       ├── private.key 
 │       └── public.key
 │
 ├── dao // 数据访问代码存放目录
@@ -139,7 +141,7 @@ if err := service.RunGRPCServer(&service.GRPCConfig{
 
 1. 采用JWT授权登录，可参考```Auth:Login()```接口的生成token方法，前端获取到```token```后需要保存到```Header```中的```authorization```。
 2. 登录状态判断，可参考```Auth:GetUserToken()```方法。
-	- 用户请求接口时，gRPC拦截器会获取 Header 携带的```authorization```参数，解析后将用户```id```保存到上下下文中，通过上下文获取用户ID方法：```utils/auth.UserIDFromContext(ctx)```
+	- 用户请求接口时，gRPC拦截器会获取 Header 携带的```authorization```参数，解析后将用户```id```保存到上下下文中，通过上下文获取用户ID方法：```interceptor.UserIDFromContext(ctx)```
 	```
 	uid, err := auth.UserIDFromContext(c)
 	if err != nil {
