@@ -41,26 +41,47 @@ root
 ## 创建项目步骤
 
 ### 一、生成proto pb文件
-- 涉及文件：root/proto/auth.yaml
-- 涉及文件：```root/genProto.sh```
 
- 在生成pb文件时，需要为gRPC接口定义请求路劲；例如：```root/proto/auth.yaml```
+1. 在```channelwill_go_basics/proto```目录下创建```.proto```文件
+2. 在```channelwill_go_basics/proto```目录下创建```.yaml```文件，用于规范```RESTful api```.
 
 
-说明：
+例子：
 
-**.yaml
+auth.proto
+```
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+package auth.v1;
+option go_package="channelwill_go_basics/proto/auth/v1;authpb";
+
+service AuthService {
+    rpc Login (google.protobuf.Empty) returns (LoginResponse);
+    rpc GetUserToken (google.protobuf.Empty) returns (GetUserTokenResponse);
+}
+
+message LoginResponse {
+    string user_token = 1;
+}
+
+message GetUserTokenResponse {
+    string token  = 1;
+}
+```
+
+auth.yaml
 ```
 type: google.api.Service
 config_version: 3
 
 http: 
   rules:
-    - selector: ProtoApi.Auth.Login
+    - selector: auth.v1.AuthService.Login
       post: /v1/login
       body: "*"
-    - selector: ProtoApi.Auth.GetUserToken
-      get: /v1/get_user_token
+    - selector: auth.v1.AuthService.GetUserToken
+      post: /v1/get_user_token
+      body: "*"
 ```
 
 
@@ -86,8 +107,8 @@ genProto auth v1
 ```
 
 ### 二、Gateway 注册服务
-- 涉及文件：```root/utils/register/server/server.go```
-- 涉及方法：```func NewClientServices() []*ClientService```
+- 文件：```channelwill_go_basics/utils/register/server/server.go```
+- 方法：```func NewClientServices() []*ClientService```
 ```
 func NewClientServices() []*ClientService {
 	services := []*ClientService{
@@ -105,7 +126,7 @@ func NewClientServices() []*ClientService {
 ```
 
 ### 三、服务注册
-- 涉及文件：```root/cmd/server/main.go```
+- 文件：```root/cmd/server/main.go```
 
 ```
 ...
@@ -138,13 +159,24 @@ if err := service.RunGRPCServer(&service.GRPCConfig{
 ```
 
 ### 四、其他说明
-
-1. 采用JWT授权登录，可参考```Auth:Login()```接口的生成token方法，前端获取到```token```后需要保存到```Header```中的```authorization```。
-2. 登录状态判断，可参考```Auth:GetUserToken()```方法。
-	- 用户请求接口时，gRPC拦截器会获取 Header 携带的```authorization```参数，解析后将用户```id```保存到上下下文中，通过上下文获取用户ID方法：```interceptor.UserIDFromContext(ctx)```
-	```
-	uid, err := auth.UserIDFromContext(c)
-	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "用户未授权")
-	}
-	```
+1. 生成JWT Token
+```
+tokenExpire := 7200 * time.Second // 失效时间
+tkn, err := s.TokenGenerator.GenerateToken(aid, tokenExpire)
+if err != nil {
+	zap.S().Error("cannot generate token", zap.Error(err))
+	return nil, status.Error(codes.Internal, "")
+}
+fmt.Println(tkn)
+```
+2. 登录状态判断
+> 前端请求需要把```token```信息存放到```Header authorization```。\
+> 后端通过上下文保存用户ID
+```
+c := context.Background()
+uid, err := interceptor.UserIDFromContext(c)
+if err != nil {
+	return nil, status.Error(codes.Unauthenticated, "用户未授权")
+}
+fmt.Println(uid)
+```

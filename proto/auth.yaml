@@ -9,6 +9,3 @@ http:
     - selector: auth.v1.AuthService.GetUserToken
       post: /v1/get_user_token
       body: "*"
-   
-    
-
