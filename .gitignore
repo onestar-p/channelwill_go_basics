@@ -1,0 +1,8 @@
+.idea
+.vscode
+.vagrant
+.DS_Store
+config.yaml
+*_test.go
+tmp
+bin

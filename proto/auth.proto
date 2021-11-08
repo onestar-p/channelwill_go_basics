@@ -1,0 +1,18 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+package auth.v1;
+option go_package="channelwill_go_basics/proto/auth/v1;authpb";
+
+service AuthService {
+    rpc Login (google.protobuf.Empty) returns (LoginResponse);
+    rpc GetUserToken (google.protobuf.Empty) returns (GetUserTokenResponse);
+}
+
+message LoginResponse {
+    string user_token = 1;
+}
+
+message GetUserTokenResponse {
+    string token  = 1;
+}
+

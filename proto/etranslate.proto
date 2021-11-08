@@ -1,0 +1,8 @@
+syntax = "proto3";
+import "google/protobuf/empty.proto";
+package etranslate.v1;
+option go_package="channelwill_go_basics/proto/etranslate/v1;etranslatepb";
+
+service EtranslateService {
+    rpc SayHello (google.protobuf.Empty) returns (google.protobuf.Empty);
+}

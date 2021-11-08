@@ -1,0 +1,11 @@
+type: google.api.Service
+config_version: 3
+
+http: 
+  rules:
+    - selector: etranslate.v1.EtranslateService.SayHello
+      get: /v1/hello
+    
+   
+    
+

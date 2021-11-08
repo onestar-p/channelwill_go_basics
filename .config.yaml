@@ -1,0 +1,37 @@
+# system configuration
+name: channelwill_go_basics
+network: tcp
+ip: 192.168.43.38
+port: 8002
+httpport: 8000
+env: dev
+
+consul:
+  ip: 192.168.43.38
+  port: 8500
+  tags :
+    - etran
+    - srv
+
+
+# mysql configuration
+database:
+  address: 192.168.43.38:3306
+  config: charset=utf8mb4
+  dbtype: mysql
+  dbname: pub_translation
+  username: root
+  password: 88888888
+
+
+redis:
+  address: 192.168.43.38:6379
+  password:
+  DB: 0
+
+jwt:
+  issuer: etranslate/auth
+  expire: 7200 # jwt 失效时间(小时)
+
+
+
