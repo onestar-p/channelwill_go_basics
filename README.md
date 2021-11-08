@@ -126,37 +126,40 @@ func NewClientServices() []*ClientService {
 ```
 
 ### 三、服务注册
-- 文件：```root/cmd/server/main.go```
+1. 创建接口文件
+	> 在目录```channelwill_go_basics/service```下创建对应接口目录
+2. 注册服务
+	> 在```root/cmd/server/main.go```文件注册创建好的接口
 
-```
-...
+	```
+	...
 
-if err := service.RunGRPCServer(&service.GRPCConfig{
-	Name:              appConfig.Name,
-	Addr:              addr,
-	AuthPublicKeyFile: publicKeyFile,
-	RegisterFunc: func(s *grpc.Server) {
-		// 注意，在创建 GRPC 服务时，需要确定该服务是否涉及到“加密”：
-		// 如有涉及，请传入 “TokenGenerator”。
-		// “TokenGenerator”： 用于生成 JWT Token。
+	if err := service.RunGRPCServer(&service.GRPCConfig{
+		Name:              appConfig.Name,
+		Addr:              addr,
+		AuthPublicKeyFile: publicKeyFile,
+		RegisterFunc: func(s *grpc.Server) {
+			// 注意，在创建 GRPC 服务时，需要确定该服务是否涉及到“加密”：
+			// 如有涉及，请传入 “TokenGenerator”。
+			// “TokenGenerator”： 用于生成 JWT Token。
 
-		// 注册etranslate服务
-		etranslatepb.RegisterEtranslateServiceServer(s, &etranslate.Service{})
+			// 注册etranslate服务
+			etranslatepb.RegisterEtranslateServiceServer(s, &etranslate.Service{})
 
-		// 注册auth服务
-		authpb.RegisterAuthServiceServer(s, &auth.Service{
-			TokenExpire:       appConfig.JwtInfo.Expire * time.Second, // token超时时间
-			AuthPublicKeyFile: etRoot.Path("config/cert/public.key"),
-			TokenGenerator:    token.NewJWTTokenGen(appConfig.JwtInfo.Issuer, privKey),
-		})
-	},
-}); err != nil {
-	zap.S().Panicf("cannot GRPC Run err: %v", err)
-}
+			// 注册auth服务
+			authpb.RegisterAuthServiceServer(s, &auth.Service{
+				TokenExpire:       appConfig.JwtInfo.Expire * time.Second, // token超时时间
+				AuthPublicKeyFile: etRoot.Path("config/cert/public.key"),
+				TokenGenerator:    jwt.NewJWTTokenGen(appConfig.JwtInfo.Issuer, privKey),
+			})
+		},
+	}); err != nil {
+		zap.S().Panicf("cannot GRPC Run err: %v", err)
+	}
 
-...
+	...
 
-```
+	```
 
 ### 四、其他说明
 1. 生成JWT Token
