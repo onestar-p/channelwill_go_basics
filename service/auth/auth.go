@@ -4,7 +4,7 @@
  * @Author: sueRimn
  * @Date: 2021-11-04 23:08:53
  * @LastEditors: sueRimn
- * @LastEditTime: 2021-11-08 17:13:15
+ * @LastEditTime: 2021-11-09 10:31:19
  */
 package auth
 
@@ -18,12 +18,11 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
-	"channelwill_go_basics/interceptor"
 	authpb "channelwill_go_basics/proto/gen/auth/v1"
+	"channelwill_go_basics/utils/auth"
 )
 
 type Service struct {
-	authpb.UnimplementedAuthServiceServer
 	TokenGenerator    TokenGenerator
 	AuthPublicKeyFile string // 公钥文件地址
 	TokenExpire       time.Duration
@@ -47,8 +46,7 @@ func (s *Service) Login(c context.Context, req *emptypb.Empty) (*authpb.LoginRes
 }
 
 func (s *Service) GetUserToken(c context.Context, req *emptypb.Empty) (*authpb.GetUserTokenResponse, error) {
-
-	uid, err := interceptor.UserIDFromContext(c)
+	uid, err := auth.NewAuthContext().UserIDFromContext(c)
 	if err != nil {
 		return nil, status.Error(codes.Unauthenticated, "用户未授权")
 	}

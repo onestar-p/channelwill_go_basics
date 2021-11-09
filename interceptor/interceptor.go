@@ -4,7 +4,7 @@
  * @Author: sueRimn
  * @Date: 2021-11-08 14:28:12
  * @LastEditors: sueRimn
- * @LastEditTime: 2021-11-08 17:15:36
+ * @LastEditTime: 2021-11-09 09:32:24
  */
 package interceptor
 
@@ -33,6 +33,7 @@ func (i *Interceptor) AddMiddleware(m MiddlewareInterfaced) {
 func (i *Interceptor) UnaryServerInterceptor() (grpc.UnaryServerInterceptor, error) {
 	return i.HandleReq, nil
 }
+
 func (i *Interceptor) HandleReq(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
 
 	for _, m := range i.Middleware {

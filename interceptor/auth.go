@@ -1,6 +1,15 @@
+/*
+ * @Descripttion:
+ * @version:
+ * @Author: sueRimn
+ * @Date: 2021-11-08 16:03:23
+ * @LastEditors: sueRimn
+ * @LastEditTime: 2021-11-09 10:30:17
+ */
 package interceptor
 
 import (
+	"channelwill_go_basics/utils/auth"
 	"channelwill_go_basics/utils/jwt"
 	"context"
 	"fmt"
@@ -33,15 +42,12 @@ func (a *Auth) Do(c context.Context) (context.Context, error) {
 		if err != nil {
 			return c, fmt.Errorf("cannot parse public key:%v", err)
 		}
-		verifier := &jwt.JWTTokenVerifyer{
-			PublicKey: pubKey,
-		}
-		uid, err := verifier.Verify(tkn)
+		uid, err := jwt.NewJWTTokenVerifyer(pubKey).Verify(tkn)
 		if err != nil {
 			return c, status.Errorf(codes.Unauthenticated, "token not valid:%v", err)
 		}
 		// 写入上下文
-		c = ContextWithUserId(c, uid)
+		c = auth.NewAuthContext().ContextWithUserId(c, uid)
 	}
 	return c, nil
 }
@@ -72,30 +78,4 @@ func (a *Auth) tokenFromContext(c context.Context) (string, error) {
 	// }
 
 	return tkn, nil
-}
-
-type userIDkey struct{}
-
-/**
- * @name: 用户ID写入上下文
- * @param {context.Context} c
- * @param {string} uid
- * @return {*}
- */
-func ContextWithUserId(c context.Context, uid string) context.Context {
-	return context.WithValue(c, userIDkey{}, uid)
-}
-
-/**
- * @name: 通过context上下文获取userid
- * @param {context.Context} c
- * @return {*}
- */
-func UserIDFromContext(c context.Context) (string, error) {
-	v := c.Value(userIDkey{})
-	uid, ok := v.(string)
-	if !ok {
-		return "", status.Error(codes.Unauthenticated, "")
-	}
-	return uid, nil
 }

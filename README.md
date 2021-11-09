@@ -183,3 +183,15 @@ if err != nil {
 }
 fmt.Println(uid)
 ```
+
+
+## 本地包说明
+1. channelwill_go_basics/utils/jwt：
+	- ```jwt.NewJWTKey(privateKeyFilePath).GetPrivateKey()```：获取私钥
+	- ```jwt.NewJWTKey(publicKeyFilePath).GetPublicKey()```：获取公钥
+	- ```jwt.NewJWTTokenGen("test", privKey).GenerateToken("id", 7200*time.Second)```：生成token
+	- ```jwt.NewJWTTokenVerifyer(pubKey).Verify(tkn)```：验证秘钥，得到解析结果
+
+2. channelwill_go_basics/utils/auth:
+	- ```auth.NewAuthContext().ContextWithUserId(c, uid)```：用户ID写入上下文
+	- ```auth.NewAuthContext().UserIDFromContext(c)```：通过上下文获取用户ID

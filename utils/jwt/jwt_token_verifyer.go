@@ -4,7 +4,7 @@
  * @Author: sueRimn
  * @Date: 2021-11-05 09:49:24
  * @LastEditors: sueRimn
- * @LastEditTime: 2021-11-08 17:01:13
+ * @LastEditTime: 2021-11-09 10:07:07
  */
 package jwt
 
@@ -16,7 +16,13 @@ import (
 )
 
 type JWTTokenVerifyer struct {
-	PublicKey *rsa.PublicKey
+	publicKey *rsa.PublicKey
+}
+
+func NewJWTTokenVerifyer(publicKey *rsa.PublicKey) *JWTTokenVerifyer {
+	return &JWTTokenVerifyer{
+		publicKey: publicKey,
+	}
 }
 
 /**
@@ -26,7 +32,7 @@ type JWTTokenVerifyer struct {
  */
 func (v *JWTTokenVerifyer) Verify(token string) (string, error) {
 	t, err := jwt.ParseWithClaims(token, &jwt.StandardClaims{}, func(t *jwt.Token) (interface{}, error) {
-		return v.PublicKey, nil
+		return v.publicKey, nil
 	})
 	if err != nil {
 		return "", fmt.Errorf("cannot parse token:%v", err)

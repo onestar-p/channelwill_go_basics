@@ -1,10 +1,5 @@
 /*
- * @Descripttion:
- * @version:
- * @Author: sueRimn
- * @Date: 2021-11-08 13:35:25
- * @LastEditors: sueRimn
- * @LastEditTime: 2021-11-08 13:56:26
+ * @Descripttion: JWT相关操作
  */
 package jwt
 
@@ -34,6 +29,9 @@ func NewJWTKey(keyFileName string) *JWTKey {
 	}
 }
 
+/**
+ * @name: 获取私钥
+ */
 func (jt *JWTKey) GetPrivateKey() (*rsa.PrivateKey, error) {
 	pkFile, err := os.Open(jt.keyFileName)
 	if err != nil {
@@ -47,6 +45,9 @@ func (jt *JWTKey) GetPrivateKey() (*rsa.PrivateKey, error) {
 	return jwt.ParseRSAPrivateKeyFromPEM(pkBytes)
 }
 
+/**
+ * @name: 获取公钥
+ */
 func (jt *JWTKey) GetPublicKey() (*rsa.PublicKey, error) {
 	f, err := os.Open(jt.keyFileName)
 	if err != nil {

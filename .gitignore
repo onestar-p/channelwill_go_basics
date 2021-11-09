@@ -6,3 +6,4 @@ config.yaml
 *_test.go
 tmp
 bin
+test
