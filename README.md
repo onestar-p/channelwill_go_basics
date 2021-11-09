@@ -8,6 +8,7 @@
 #### 使用扩展
 - go.uber.org/zap ：用于打印日志
 - entgo.io/ent ：ORM
+- github.com/go-playground/validator/v10：数据验证扩展
 
 ## 目录/文件说明
 ```
@@ -22,6 +23,8 @@ root
 │       └── client.go // 数据库初始化目录（MySQL、Redis...）
 │
 ├── genProto.sh // 生成proto文件
+│
+├── forms // 参数验证目录
 │
 ├── global // 全局目录
 │   └── global.go
@@ -78,9 +81,6 @@ http:
   rules:
     - selector: auth.v1.AuthService.Login
       post: /v1/login
-      body: "*"
-    - selector: auth.v1.AuthService.GetUserToken
-      post: /v1/get_user_token
       body: "*"
 ```
 
@@ -177,7 +177,7 @@ fmt.Println(tkn)
 > 后端通过上下文保存用户ID
 ```
 c := context.Background()
-uid, err := interceptor.UserIDFromContext(c)
+uid, err := auth.NewAuthContext().UserIDFromContext(c)
 if err != nil {
 	return nil, status.Error(codes.Unauthenticated, "用户未授权")
 }
@@ -193,5 +193,19 @@ fmt.Println(uid)
 	- ```jwt.NewJWTTokenVerifyer(pubKey).Verify(tkn)```：验证秘钥，得到解析结果
 
 2. channelwill_go_basics/utils/auth:
-	- ```auth.NewAuthContext().ContextWithUserId(c, uid)```：用户ID写入上下文
-	- ```auth.NewAuthContext().UserIDFromContext(c)```：通过上下文获取用户ID
+	- ```auth.NewAuthContext().ContextWithUserId(context.Background(), uid)```：用户ID写入上下文
+	- ```auth.NewAuthContext().UserIDFromContext(context.Background())```：通过上下文获取用户ID
+
+3. channelwill_go_basics/utils/validate: 参数验证
+	- ```validate.NewValidate().Verify(login)```
+
+	例子：
+	```
+	login := forms.AuthLoginForm{
+		UserName: req.UserName,
+		Passwd:   req.Passwd,
+	}
+	if err := validate.NewValidate().Verify(login); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+	```

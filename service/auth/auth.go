@@ -10,16 +10,15 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.uber.org/zap"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 
+	"channelwill_go_basics/forms"
 	authpb "channelwill_go_basics/proto/gen/auth/v1"
-	"channelwill_go_basics/utils/auth"
+	"channelwill_go_basics/utils/validate"
 )
 
 type Service struct {
@@ -32,7 +31,16 @@ type TokenGenerator interface {
 	GenerateToken(userId string, expire time.Duration) (string, error)
 }
 
-func (s *Service) Login(c context.Context, req *emptypb.Empty) (*authpb.LoginResponse, error) {
+func (s *Service) Login(c context.Context, req *authpb.LoginRequest) (*authpb.LoginResponse, error) {
+
+	login := forms.AuthLoginForm{
+		UserName: req.UserName,
+		Passwd:   req.Passwd,
+	}
+	if err := validate.NewValidate().Verify(login); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	aid := "123123123"
 	// 生成token
 	tkn, err := s.TokenGenerator.GenerateToken(aid, s.TokenExpire)
@@ -42,16 +50,5 @@ func (s *Service) Login(c context.Context, req *emptypb.Empty) (*authpb.LoginRes
 	}
 	return &authpb.LoginResponse{
 		UserToken: tkn,
-	}, nil
-}
-
-func (s *Service) GetUserToken(c context.Context, req *emptypb.Empty) (*authpb.GetUserTokenResponse, error) {
-	uid, err := auth.NewAuthContext().UserIDFromContext(c)
-	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "用户未授权")
-	}
-
-	return &authpb.GetUserTokenResponse{
-		Token: fmt.Sprintf("%s:%d", uid, 02),
 	}, nil
 }
