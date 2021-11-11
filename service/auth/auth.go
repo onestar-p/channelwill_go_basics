@@ -10,6 +10,7 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -17,7 +18,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"channelwill_go_basics/forms"
-	authpb "channelwill_go_basics/proto/gen/auth/v1"
+	authpb "channelwill_go_basics/proto/auth/gen/v1"
 	"channelwill_go_basics/utils/validate"
 )
 
@@ -42,6 +43,8 @@ func (s *Service) Login(c context.Context, req *authpb.LoginRequest) (*authpb.Lo
 	}
 
 	aid := "123123123"
+
+	fmt.Println("Auth Login...")
 	// 生成token
 	tkn, err := s.TokenGenerator.GenerateToken(aid, s.TokenExpire)
 	if err != nil {

@@ -36,6 +36,9 @@ root
 ├── interceptor // gRPC拦截器目录
 │
 ├── proto // proto文件存放目录
+│   ├── auth 		// 授权服务
+│   └── etranslate 	// 翻译服务
+│
 ├── service // gRPC 接口目录
 └── utils // 工具类目录
 ```
@@ -89,11 +92,11 @@ genProto.sh
 ```
 function genProto {
     PROTO_NAME=$1
-    PROTO_PATH=./proto
+    PROTO_PATH=./${PROTO_NAME}
     if [ $2 ]; then
-        GO_OUT_PATH="${PROTO_PATH}/gen/${PROTO_NAME}/${2}"
+        GO_OUT_PATH="${PROTO_PATH}/gen/${2}"
     else
-        GO_OUT_PATH=${PROTO_PATH}/gen/${PROTO_NAME}
+        GO_OUT_PATH=${PROTO_PATH}/gen
     fi
     mkdir -p $GO_OUT_PATH
     protoc -I=${PROTO_PATH} --go_out=plugins=grpc,paths=source_relative:$GO_OUT_PATH ${PROTO_NAME}.proto
@@ -101,27 +104,49 @@ function genProto {
 
 }
 
-// genProto {proto文件名} + {版本}
+# genProto service v1
 genProto etranslate v1
 genProto auth v1
+
 ```
 
 ### 二、Gateway 注册服务
-- 文件：```channelwill_go_basics/utils/register/server/server.go```
-- 方法：```func NewClientServices() []*ClientService```
+- 文件：```channelwill_go_basics/initialize/servers.go```
+- 方法：```func InitGateway() *servers.Servers```
 ```
-func NewClientServices() []*ClientService {
-	services := []*ClientService{
-		{
-			Name:         "auth",
-			RegisterFunc: authpb.RegisterAuthServiceHandler, // auth pb
+// 网关初始化
+func InitGateway() *servers.Servers {
+	regServers := servers.NewServers(&servers.ServerConfig{
+		ConsulIp:      appConfig.ConsulInfo.Ip,
+		ConsulPort:    appConfig.ConsulInfo.Port,
+		ConsulTags:    appConfig.ConsulInfo.Tags,
+		AppIp:         appConfig.Ip,
+		AppPort:       appConfig.Port,
+		AppAddr:       fmt.Sprintf(":%d", appConfig.Port),
+		PublicKeyFile: publicKeyFile,
+	})
+
+	// 网关
+	regServers.AddServerRegisterHandler(&servers.ServerRegisterHandler{
+		ServerName: "auth",
+		RegisterHandlerFunc: func(ctx context.Context, conn *grpc.ClientConn, mux *runtime.ServeMux) {
+			c := authpb.NewAuthServiceClient(conn)
+			if err := authpb.RegisterAuthServiceHandlerClient(ctx, mux, c); err != nil {
+				zap.S().Fatal("cannot register auth service handler client", zap.Error(err))
+			}
 		},
-		{
-			Name:         "extranslate",                                 // 服务名
-			RegisterFunc: etranslatepb.RegisterEtranslateServiceHandler, // etranslate pb
+	})
+
+	regServers.AddServerRegisterHandler(&servers.ServerRegisterHandler{
+		ServerName: "etranslate",
+		RegisterHandlerFunc: func(ctx context.Context, conn *grpc.ClientConn, mux *runtime.ServeMux) {
+			c := etranslatepb.NewEtranslateServiceClient(conn)
+			if err := etranslatepb.RegisterEtranslateServiceHandlerClient(ctx, mux, c); err != nil {
+				zap.S().Fatal("cannot register auth service handler client", zap.Error(err))
+			}
 		},
-	}
-	return services
+	})
+	return regServers
 }
 ```
 
@@ -129,35 +154,50 @@ func NewClientServices() []*ClientService {
 1. 创建接口文件
 	> 在目录```channelwill_go_basics/service```下创建对应接口目录
 2. 注册服务
-	> 在```root/cmd/server/main.go```文件注册创建好的接口
+	- 在```channelwill_go_basics/initialize/servers.go```文件注册创建好的接口
+	- 方法```func InitServers() *servers.Servers```
 
 	```
-	...
+	func InitServers() *servers.Servers {
+		regServers := servers.NewServers(&servers.ServerConfig{
+			ConsulIp:      appConfig.ConsulInfo.Ip,
+			ConsulPort:    appConfig.ConsulInfo.Port,
+			ConsulTags:    appConfig.ConsulInfo.Tags,
+			AppIp:         appConfig.Ip,
+			AppPort:       appConfig.Port,
+			AppAddr:       fmt.Sprintf(":%d", appConfig.Port),
+			PublicKeyFile: publicKeyFile,
+		})
 
-	if err := service.RunGRPCServer(&service.GRPCConfig{
-		Name:              appConfig.Name,
-		Addr:              addr,
-		AuthPublicKeyFile: publicKeyFile,
-		RegisterFunc: func(s *grpc.Server) {
-			// 注意，在创建 GRPC 服务时，需要确定该服务是否涉及到“加密”：
-			// 如有涉及，请传入 “TokenGenerator”。
-			// “TokenGenerator”： 用于生成 JWT Token。
+		// Auth
+		regServers.AddServerRegisterServerFunc(&servers.ServerRegisterServerFunc{
+			ServerName: "auth",
+			RegisterServerFunc: func(s *grpc.Server) {
 
-			// 注册etranslate服务
-			etranslatepb.RegisterEtranslateServiceServer(s, &etranslate.Service{})
+				privateKeyFile := etRoot.Path("config/cert/private.key") // 私钥路径
+				privKey, err := jwt.NewJWTKey(privateKeyFile).GetPrivateKey()
+				if err != nil {
+					zap.S().Fatal("cannot pare private key", zap.Error(err))
+				}
+				// 注册auth服务
+				authpb.RegisterAuthServiceServer(s, &auth.Service{
+					TokenExpire:       7200 * time.Second, // token超时时间
+					AuthPublicKeyFile: publicKeyFile,
+					TokenGenerator:    jwt.NewJWTTokenGen("channelwill_go_basics/auth", privKey),
+				})
+			},
+		})
 
-			// 注册auth服务
-			authpb.RegisterAuthServiceServer(s, &auth.Service{
-				TokenExpire:       appConfig.JwtInfo.Expire * time.Second, // token超时时间
-				AuthPublicKeyFile: etRoot.Path("config/cert/public.key"),
-				TokenGenerator:    jwt.NewJWTTokenGen(appConfig.JwtInfo.Issuer, privKey),
-			})
-		},
-	}); err != nil {
-		zap.S().Panicf("cannot GRPC Run err: %v", err)
+		// 添加etranslate服务
+		regServers.AddServerRegisterServerFunc(&servers.ServerRegisterServerFunc{
+			ServerName: "etranslate",
+			RegisterServerFunc: func(s *grpc.Server) {
+				etranslatepb.RegisterEtranslateServiceServer(s, &etranslate.Service{})
+
+			},
+		})
+		return regServers
 	}
-
-	...
 
 	```
 
@@ -201,6 +241,10 @@ fmt.Println(uid)
 
 	例子：
 	```
+	type AuthLoginForm struct {
+    	UserName string `json:"user_name" validate:"required,min=3,max=10"`
+    	Passwd   string `json:"passwd" validate:"required,min=3,max=10"`
+    }
 	login := forms.AuthLoginForm{
 		UserName: req.UserName,
 		Passwd:   req.Passwd,
