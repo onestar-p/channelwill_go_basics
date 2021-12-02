@@ -12,13 +12,21 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
+
+	"channelwill_go_basics/utils"
 )
 
 type Service struct {
 }
 
 func (s *Service) SayHello(c context.Context, req *emptypb.Empty) (*emptypb.Empty, error) {
-	fmt.Println("Hellow")
+	uid, err := utils.Auth.UserIDFromContext(c)
+	if err != nil {
+		return nil, status.Error(codes.Unauthenticated, "用户未登录")
+	}
+	fmt.Println("Hellow", uid)
 	return &emptypb.Empty{}, nil
 }

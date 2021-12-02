@@ -9,8 +9,8 @@
 package interceptor
 
 import (
-	"channelwill_go_basics/utils/auth"
-	"channelwill_go_basics/utils/jwt"
+	"channelwill_go_basics/utils"
+	"channelwill_go_basics/utils/token"
 	"context"
 	"fmt"
 	"strings"
@@ -26,7 +26,6 @@ const (
 )
 
 type Auth struct {
-	PublicKeyFile string
 }
 
 func (a *Auth) Do(c context.Context) (context.Context, error) {
@@ -37,17 +36,12 @@ func (a *Auth) Do(c context.Context) (context.Context, error) {
 
 	// 验证加密后的数据，并解密得到结果
 	if tkn != "" {
-		// 解析公钥
-		pubKey, err := jwt.NewJWTKey(a.PublicKeyFile).GetPublicKey()
-		if err != nil {
-			return c, fmt.Errorf("cannot parse public key:%v", err)
-		}
-		uid, err := jwt.NewJWTTokenVerifyer(pubKey).Verify(tkn)
-		if err != nil {
+		uid, err := utils.NewToken(token.JWTType).Verify(tkn)
+		if err != nil { // 此处token验证根据实际业务情况做修改。
 			return c, status.Errorf(codes.Unauthenticated, "token not valid:%v", err)
 		}
 		// 写入上下文
-		c = auth.NewAuthContext().ContextWithUserId(c, uid)
+		c = utils.Auth.ContextWithUserId(c, uid)
 	}
 	return c, nil
 }

@@ -3,7 +3,6 @@
 .vagrant
 .DS_Store
 config.yaml
-*_test.go
 tmp
 bin
-test
+wrk_test

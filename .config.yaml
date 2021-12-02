@@ -1,10 +1,18 @@
 # system configuration
-name: channelwill_go_basics
+name: etranslate_service_go
 network: tcp
 ip: 192.168.43.38
 port: 8002
+autoport: true #  开启自动获取端口，开启后 port 端口将不使用（注意，此配置值针对对服务有效）
 httpport: 8000
 env: dev
+machine_id: 65535 # 服务器机器ID
+merchant_srv: "merchant"
+etranslate_srv: "etranslate"
+
+log:
+  debug: false # 关闭 Debug 后，只记录"警告"及"错误"日志
+  log_path: logs # 日志保存目录：项目当前目录下
 
 consul:
   ip: 192.168.43.38
@@ -20,6 +28,7 @@ database:
   config: charset=utf8mb4
   dbtype: mysql
   dbname: pub_translation
+  dbprefix: lo_
   username: root
   password: 88888888
 
@@ -27,11 +36,24 @@ database:
 redis:
   address: 192.168.43.38:6379
   password:
-  DB: 0
+  db: 0
 
 jwt:
   issuer: etranslate/auth
-  expire: 7200 # jwt 失效时间(小时)
+  expire: 7200 # jwt 失效时间(秒)
 
+aes:
+  key: hH4mS8tY9jB1cP2d
+  iv: rN3aA2zQ8vP9lA4x
+  mode: RD
 
+email:
+  host: smtp.mailgun.org
+  port: 587
+  username: test@test.test.com
+  fromname: Etranslate
+  passwd: test-test-test-test-test
 
+dingtalk: # 钉钉机器人
+  accesstoken: test
+  secret: test

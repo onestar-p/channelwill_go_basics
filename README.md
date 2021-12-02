@@ -36,8 +36,16 @@ root
 ├── interceptor // gRPC拦截器目录
 │
 ├── proto // proto文件存放目录
+│   ├── auth 		// 授权服务
+│   └── etranslate 	// 翻译服务
+│
 ├── service // gRPC 接口目录
 └── utils // 工具类目录
+    ├── encrypter/aes // AES加密/解密
+    ├── id_generate // ID生成工具
+    ├── jwt 
+    ├── excel 		// excel导出
+    └── validate // 参数数据验证
 ```
 
 
@@ -89,11 +97,11 @@ genProto.sh
 ```
 function genProto {
     PROTO_NAME=$1
-    PROTO_PATH=./proto
+    PROTO_PATH=./${PROTO_NAME}
     if [ $2 ]; then
-        GO_OUT_PATH="${PROTO_PATH}/gen/${PROTO_NAME}/${2}"
+        GO_OUT_PATH="${PROTO_PATH}/gen/${2}"
     else
-        GO_OUT_PATH=${PROTO_PATH}/gen/${PROTO_NAME}
+        GO_OUT_PATH=${PROTO_PATH}/gen
     fi
     mkdir -p $GO_OUT_PATH
     protoc -I=${PROTO_PATH} --go_out=plugins=grpc,paths=source_relative:$GO_OUT_PATH ${PROTO_NAME}.proto
@@ -101,63 +109,92 @@ function genProto {
 
 }
 
-// genProto {proto文件名} + {版本}
+# genProto service v1
 genProto etranslate v1
 genProto auth v1
+
 ```
 
 ### 二、Gateway 注册服务
-- 文件：```channelwill_go_basics/utils/register/server/server.go```
-- 方法：```func NewClientServices() []*ClientService```
-```
-func NewClientServices() []*ClientService {
-	services := []*ClientService{
-		{
-			Name:         "auth",
-			RegisterFunc: authpb.RegisterAuthServiceHandler, // auth pb
-		},
-		{
-			Name:         "extranslate",                                 // 服务名
-			RegisterFunc: etranslatepb.RegisterEtranslateServiceHandler, // etranslate pb
-		},
+- 文件：```channelwill_go_basics/initialize/servers.go```
+- 方法：```func InitGateway() *servers.Servers```
+	```
+	// 网关初始化
+	func InitGateway() *servers.Servers {
+		regServers := servers.NewServers(&servers.ServerConfig{
+			ConsulIp:   appConfig.ConsulInfo.Ip,
+			ConsulPort: appConfig.ConsulInfo.Port,
+			ConsulTags: appConfig.ConsulInfo.Tags,
+			AppIp:      appConfig.Ip,
+			AppPort:    appConfig.Port,
+			AppAddr:    fmt.Sprintf(":%d", appConfig.Port),
+		})
+
+		// 网关
+		regServers.AddServerRegisterHandler(&servers.ServerRegisterHandlerFunc{
+			ServerName: "auth",
+			RegisterHandlerFunc: func(ctx context.Context, conn *grpc.ClientConn, mux *runtime.ServeMux) {
+				c := authpb.NewAuthServiceClient(conn)
+				if err := authpb.RegisterAuthServiceHandlerClient(ctx, mux, c); err != nil {
+					zap.S().Fatal("cannot register auth service handler client", zap.Error(err))
+				}
+			},
+		})
+
+		regServers.AddServerRegisterHandler(&servers.ServerRegisterHandlerFunc{
+			ServerName: "etranslate",
+			RegisterHandlerFunc: func(ctx context.Context, conn *grpc.ClientConn, mux *runtime.ServeMux) {
+				c := etranslatepb.NewEtranslateServiceClient(conn)
+				if err := etranslatepb.RegisterEtranslateServiceHandlerClient(ctx, mux, c); err != nil {
+					zap.S().Fatal("cannot register auth service handler client", zap.Error(err))
+				}
+			},
+		})
+		return regServers
 	}
-	return services
-}
-```
+	```
 
 ### 三、服务注册
 1. 创建接口文件
 	> 在目录```channelwill_go_basics/service```下创建对应接口目录
 2. 注册服务
-	> 在```root/cmd/server/main.go```文件注册创建好的接口
+	- 在```channelwill_go_basics/initialize/servers.go```文件注册创建好的接口
+	- 方法```func InitServers() *servers.Servers```
 
 	```
-	...
+	func InitServers() *servers.Servers {
+		regServers := servers.NewServers(&servers.ServerConfig{
+			ConsulIp:   appConfig.ConsulInfo.Ip,
+			ConsulPort: appConfig.ConsulInfo.Port,
+			ConsulTags: appConfig.ConsulInfo.Tags,
+			AppIp:      appConfig.Ip,
+			AppPort:    appConfig.Port,
+			AppAddr:    fmt.Sprintf(":%d", appConfig.Port),
+		})
 
-	if err := service.RunGRPCServer(&service.GRPCConfig{
-		Name:              appConfig.Name,
-		Addr:              addr,
-		AuthPublicKeyFile: publicKeyFile,
-		RegisterFunc: func(s *grpc.Server) {
-			// 注意，在创建 GRPC 服务时，需要确定该服务是否涉及到“加密”：
-			// 如有涉及，请传入 “TokenGenerator”。
-			// “TokenGenerator”： 用于生成 JWT Token。
+		// Auth
+		regServers.AddServerRegisterServerFunc(&servers.ServerRegisterServerFunc{
+			ServerName: "auth",
+			RegisterServerFunc: func(s *grpc.Server) {
 
-			// 注册etranslate服务
-			etranslatepb.RegisterEtranslateServiceServer(s, &etranslate.Service{})
+				// 注册auth服务
+				authpb.RegisterAuthServiceServer(s, &auth.Service{
+					TokenExpire:    appConfig.JwtInfo.Expire * time.Second, // token超时时间
+					TokenGenerator: utils.NewToken(token.JWTType),
+				})
+			},
+		})
 
-			// 注册auth服务
-			authpb.RegisterAuthServiceServer(s, &auth.Service{
-				TokenExpire:       appConfig.JwtInfo.Expire * time.Second, // token超时时间
-				AuthPublicKeyFile: etRoot.Path("config/cert/public.key"),
-				TokenGenerator:    jwt.NewJWTTokenGen(appConfig.JwtInfo.Issuer, privKey),
-			})
-		},
-	}); err != nil {
-		zap.S().Panicf("cannot GRPC Run err: %v", err)
+		// 添加etranslate服务
+		regServers.AddServerRegisterServerFunc(&servers.ServerRegisterServerFunc{
+			ServerName: "etranslate",
+			RegisterServerFunc: func(s *grpc.Server) {
+				etranslatepb.RegisterEtranslateServiceServer(s, &etranslate.Service{})
+
+			},
+		})
+		return regServers
 	}
-
-	...
 
 	```
 
@@ -165,7 +202,7 @@ func NewClientServices() []*ClientService {
 1. 生成JWT Token
 ```
 tokenExpire := 7200 * time.Second // 失效时间
-tkn, err := s.TokenGenerator.GenerateToken(aid, tokenExpire)
+tkn, err := utils.NewToken(token.JWTType).GenToken(aid, tokenExpire)
 if err != nil {
 	zap.S().Error("cannot generate token", zap.Error(err))
 	return nil, status.Error(codes.Internal, "")
@@ -177,7 +214,7 @@ fmt.Println(tkn)
 > 后端通过上下文保存用户ID
 ```
 c := context.Background()
-uid, err := auth.NewAuthContext().UserIDFromContext(c)
+uid, err := utils.Auth.UserIDFromContext(c)
 if err != nil {
 	return nil, status.Error(codes.Unauthenticated, "用户未授权")
 }
@@ -187,20 +224,22 @@ fmt.Println(uid)
 
 ## 本地包说明
 1. channelwill_go_basics/utils/jwt：
-	- ```jwt.NewJWTKey(privateKeyFilePath).GetPrivateKey()```：获取私钥
-	- ```jwt.NewJWTKey(publicKeyFilePath).GetPublicKey()```：获取公钥
-	- ```jwt.NewJWTTokenGen("test", privKey).GenerateToken("id", 7200*time.Second)```：生成token
-	- ```jwt.NewJWTTokenVerifyer(pubKey).Verify(tkn)```：验证秘钥，得到解析结果
+	- ```utils.JWTKey(privateKeyFilePath).GetPrivateKey()```：获取私钥
+	- ```utils.JWTKey(publicKeyFilePath).GetPublicKey()```：获取公钥
 
 2. channelwill_go_basics/utils/auth:
-	- ```auth.NewAuthContext().ContextWithUserId(context.Background(), uid)```：用户ID写入上下文
-	- ```auth.NewAuthContext().UserIDFromContext(context.Background())```：通过上下文获取用户ID
+	- ```utils.Auth.ContextWithUserId(context.Background(), uid)```：用户ID写入上下文
+	- ```utils.Auth.UserIDFromContext(context.Background())```：通过上下文获取用户ID
 
 3. channelwill_go_basics/utils/validate: 参数验证
-	- ```validate.NewValidate().Verify(login)```
+	- ```utils.Validate.Verify(login)```
 
 	例子：
 	```
+	type AuthLoginForm struct {
+    	UserName string `json:"user_name" validate:"required,min=3,max=10"`
+    	Passwd   string `json:"passwd" validate:"required,min=3,max=10"`
+    }
 	login := forms.AuthLoginForm{
 		UserName: req.UserName,
 		Passwd:   req.Passwd,
@@ -208,4 +247,87 @@ fmt.Println(uid)
 	if err := validate.NewValidate().Verify(login); err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
+	```
+4.  /utils/encrypter: AES加密/解密
+	- ```res, _ := utils.AES.Encrypt("123")```：加密
+	- ```res, _ = utils.AES.Decrypt(res)```：解密
+
+	例子1（使用默认参数）：
+	```
+	res, _ := utils.AES.Encrypt("123")
+	fmt.Println(res)
+
+	res, _ = utils.AES.Decrypt(res)
+	fmt.Println(res)
+	```
+	例子2（自定义参数）
+	```
+	aes := encrypter.NewAES(&encrypter.AesConfig{
+		Key:  "5f4d6e01d6a7fbf6", // 秘钥；秘钥长度决定加密方式：16位：aes-128-cbc；24位：aes-192-cbc；32位：aes-256-cbc
+		Iv:   "0fd09fa03ec122f7", // 秘钥偏移量
+		Mode: "RD",               // 数据格式
+	})
+	res, _ = aes.Encrypt("abc")
+	fmt.Println(res)
+
+	res, _ = aes.Decrypt(res)
+	fmt.Println(res)
+	```
+	> 注意：config.yaml 配置文件中的 AES 配置，只对自定义有效
+
+5. channelwill_go_basics/utils/id_generate：ID生成
+	```
+	// 雪花ID
+	id, _ := utils.IDGenerate(id_generate.Snowflake).GetID()
+	fmt.Printf("Snowflake ID: %s\n", id)
+
+	// uuid
+	id, _ = id_generate.NewIDGenerate(id_generate.GenUuid).GetID()
+	fmt.Printf("UUID: %s\n", id)
+	```
+6. channelwill_go_basics/utils/token：Token操作
+	- ```utils.NewToken(token.JWTType).GenToken("id", 7200*time.Second)```：生成JWT token
+	- ```utils.NewToken(token.JWTType).Verify(tkn)```：验证秘钥，得到解析结果
+	- ```utils.NewToken(token.SHA1Type).GenToken("my.shopify.com", 0)```：使用SHA1加密算法生成Token
+7. channelwill_go_basics/utils/email：邮件发送
+	```
+	to := []string{
+		// "2912313265@qq.com",
+		// "antxiaoye@gmail.com",
+	}
+	err := email.NewEmail().Send(to, "title test", "<h1>Hello test 你好测试</h1>")
+	fmt.Println(err)
+	```
+8. channelwill_go_basics/utils/excel：表单导出
+	```
+	filePath := "./csv_test.csv"
+	csv := NewCsv(filePath)
+	header := []string{
+		"编号", "姓名", "年龄",
+	}
+	csv.SetHeader(header)
+	datas := [][]string{
+		{"123", "Golang", "18"},
+		{"123", "Golang", "18"},
+	}
+	csv.AppendDatas(datas...)
+	if err := csv.Export(); err != nil {
+		panic(err)
+	}
+
+	for i := 1; i < 100; i++ {
+		data := []string{fmt.Sprintf("%d", i), fmt.Sprintf("Golang%d", i), "18"}
+		csv.AppendDatas(data)
+	}
+
+	if err := csv.AdditionalExport(); err != nil {
+		panic(err)
+	}
+	```
+9. channelwill_go_basics/utils/dingtalk：钉钉机器人消息推送
+	```
+	err := dingtalk.NewDingtalk().SendMessage(func() []byte {
+		return NewTextMessage("test").Marshal()
+	})
+	fmt.Println(err)	
 	```

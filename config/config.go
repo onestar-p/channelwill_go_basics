@@ -11,15 +11,23 @@ package config
 import "time"
 
 type ApplicationConfig struct {
-	Name         string         `mapstructure:"name"`
-	Network      string         `mapstructure:"network"`
-	Ip           string         `mapstructure:"Ip"`
-	Port         int            `mapstructure:"port"`
-	HttpPort     int            `mapstructure:"httpport"`
-	Env          string         `mapstructure:"env"`
-	ConsulInfo   ConsulConfig   `mapstructure:"consul"`
-	DatabaseInfo DatabaseConfig `mapstructure:"database"`
-	JwtInfo      JwtConfig      `mapstructure:"jwt"`
+	Name          string         `mapstructure:"name"`
+	Network       string         `mapstructure:"network"`
+	Ip            string         `mapstructure:"Ip"`
+	Port          int            `mapstructure:"port"`
+	AutoPort      bool           `mapstructure:"autoport"`
+	HttpPort      int            `mapstructure:"httpport"`
+	Env           string         `mapstructure:"env"`
+	MachineId     uint16         `mapstructure:"machine_id"`
+	AuthSrv       string         `mapstructure:"auth_srv"`
+	EtranslateSrv string         `mapstructure:"etranslate_srv"`
+	ConsulInfo    ConsulConfig   `mapstructure:"consul"`
+	DatabaseInfo  DatabaseConfig `mapstructure:"database"`
+	JwtInfo       JwtConfig      `mapstructure:"jwt"`
+	AESInfo       AesConfig      `mapstructure:"aes"`
+	EmailInfo     EmailConfig    `mapstructure:"email"`
+	RedisInfo     RedisConfig    `mapstructure:"redis"`
+	DingtalkInfo  DingtalkConfig `mapstructure:"dingtalk"`
 }
 
 type ConsulConfig struct {
@@ -39,4 +47,28 @@ type DatabaseConfig struct {
 type JwtConfig struct {
 	Issuer string        `mapstructure:"issuer"`
 	Expire time.Duration `mapstructure:"expire"`
+}
+
+type AesConfig struct {
+	Key  string `mapstructure:"key"`
+	Iv   string `mapstructure:"iv"`
+	Mode string `mapstructure:"mode"`
+}
+
+type EmailConfig struct {
+	Host     string `mapstructure:"Host"`
+	Port     int    `mapstructure:"Port"`
+	Username string `mapstructure:"username"`
+	Fromname string `mapstructure:"fromname"`
+	Passwd   string `mapstructure:"passwd"`
+}
+
+type RedisConfig struct {
+	Address  string `mapstructure:"address"`
+	Password string `mapstructure:"address"`
+	DB       int    `mapstructure:"db"`
+}
+
+type DingtalkConfig struct {
+	AccessToken string `mapstructure:"accesstoken"`
 }
