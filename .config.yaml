@@ -1,5 +1,5 @@
 # system configuration
-name: etranslate_service_go
+name: channelwill_go_basics
 network: tcp
 ip: 192.168.43.38
 port: 8002
